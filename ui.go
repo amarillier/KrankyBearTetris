@@ -101,9 +101,8 @@ func (ui *GameUI) checkForUpdates() {
 // setupUI creates the UI layout
 func (ui *GameUI) setupUI() {
 	ui.window.Resize(fyne.NewSize(500, 700))
-	// Center window on screen - Fyne will center on the primary display
-	// or the display containing the cursor on platforms that support it
-	ui.window.CenterOnScreen()
+	// Window positioning will be handled in ShowAndRun() using the same pattern
+	// as KrankyBearFileMover: show first, then center
 
 	// Create canvas for game board
 	ui.boardCanvas = canvas.NewRaster(ui.drawBoard)
@@ -548,8 +547,13 @@ func (ui *GameUI) Show() {
 }
 
 // ShowAndRun shows the window and runs the application
+// Uses the same pattern as KrankyBearFileMover: position on active display, then show and run
 func (ui *GameUI) ShowAndRun() {
-	// ShowAndRun() shows the window and runs the app loop
+	// Position window on the display containing the mouse cursor
+	// This uses a temporary window to help Fyne detect which display to use
+	ui.positionWindowOnActiveDisplay()
+
+	// Show window and run app loop
 	ui.window.ShowAndRun()
 }
 
@@ -754,12 +758,20 @@ func max(a, b int) int {
 	return b
 }
 
+// positionWindowOnActiveDisplay positions the main window on the display where the mouse cursor is
+// Uses platform-specific code on macOS to detect mouse position and position window accordingly
+func (ui *GameUI) positionWindowOnActiveDisplay() {
+	// Use platform-specific function to position window on display containing mouse cursor
+	positionWindowOnMouseDisplay(ui.app, ui.window)
+}
+
 // positionDialogRelativeToMain positions a dialog window relative to the main window
-// Since Fyne doesn't expose Position/Size directly, we show the dialog first
-// then center it on the same display as the main window
+// Uses the same pattern as KrankyBearFileMover: show first, then center
+// This ensures the dialog appears on the same display as the main window
 func (ui *GameUI) positionDialogRelativeToMain(dialogWindow fyne.Window) {
-	// Show the dialog first so it's on a display, then center it
-	// CenterOnScreen() centers on the monitor the window is currently on
+	// Show the dialog first (it will appear on the same display as the main window)
+	// then center it on that display
+	dialogWindow.Show()
 	dialogWindow.CenterOnScreen()
 }
 

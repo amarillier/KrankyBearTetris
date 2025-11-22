@@ -26,6 +26,7 @@ git.txt
 latestcheck.json
 
 ## Build artifacts
+tetris
 bin/.DS_Store
 Resources/
 dist/

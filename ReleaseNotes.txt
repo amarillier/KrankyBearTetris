@@ -2,8 +2,9 @@ Release notes
 
 0.1.NEXT
 - nothing specific planned for now
+- attempting better active display / mouse location for opening the game at launch on the current display
 - possible iPhone and Android builds (README for sideloading notes)
 
 0.1.0 
 - initial checkin
-- Windows, Linux and MacOS notifications
+- Windows, Linux and MacOS Tetris game
