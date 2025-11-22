@@ -42,6 +42,7 @@ type GameUI struct {
 	resetDialog      fyne.Window // Track reset confirmation dialog window
 	aboutDialog      fyne.Window // Track about dialog window
 	helpDialog       fyne.Window // Track help dialog window
+	updateDialog     fyne.Window // Track update check dialog window
 	showMenuItem     *fyne.MenuItem
 	hideMenuItem     *fyne.MenuItem
 	windowVisible    bool   // Track window visibility state
@@ -84,11 +85,14 @@ func (ui *GameUI) updateChecker() (string, bool) {
 
 // checkForUpdates checks for updates and updates version status
 func (ui *GameUI) checkForUpdates() {
-	updtmsg, _ := ui.updateChecker()
-	if strings.Contains(updtmsg, "newer version") {
-		ui.versionStatus = "newer"
-	} else if strings.Contains(updtmsg, "running the latest") {
-		ui.versionStatus = "current"
+	updtmsg, updateAvailable := ui.updateChecker()
+	// Check if we're running a newer version than released
+	if strings.Contains(updtmsg, "running a newer version") || strings.Contains(updtmsg, "newer than") {
+		ui.versionStatus = "newer" // We're running newer than released
+	} else if strings.Contains(updtmsg, "running the latest") || strings.Contains(updtmsg, "up to date") {
+		ui.versionStatus = "current" // Version matches released
+	} else if updateAvailable {
+		ui.versionStatus = "update" // Update available
 	} else {
 		ui.versionStatus = "unknown"
 	}
@@ -172,6 +176,13 @@ func (ui *GameUI) setupUI() {
 
 // setupMenu sets up the menu bar
 func (ui *GameUI) setupMenu() {
+
+	showMenu := fyne.NewMenuItem("Show", func() {
+		fyne.Do(ui.showWindow)
+	})
+	hideMenu := fyne.NewMenuItem("Hide", func() {
+		fyne.Do(ui.hideWindow)
+	})
 	aboutMenu := fyne.NewMenuItem("About", func() {
 		fyne.Do(ui.showAboutDialog)
 	})
@@ -179,25 +190,16 @@ func (ui *GameUI) setupMenu() {
 		fyne.Do(ui.showHelpDialog)
 	})
 	updateMenu := fyne.NewMenuItem("Check for Update", func() {
-		fyne.Do(func() {
-			ui.checkForUpdates()
-			ui.showAboutDialog() // Show about dialog with updated version status
-		})
-	})
-	showMenu := fyne.NewMenuItem("Show", func() {
-		fyne.Do(ui.showWindow)
-	})
-	hideMenu := fyne.NewMenuItem("Hide", func() {
-		fyne.Do(ui.hideWindow)
+		ui.showUpdateDialog()
 	})
 
 	mainMenu := fyne.NewMenu("KrankyBear Tetris",
+		showMenu,
+		hideMenu,
+		fyne.NewMenuItemSeparator(),
 		aboutMenu,
 		helpMenu,
 		updateMenu,
-		fyne.NewMenuItemSeparator(),
-		showMenu,
-		hideMenu,
 	)
 
 	menu := fyne.NewMainMenu(mainMenu)
@@ -209,36 +211,35 @@ func (ui *GameUI) setupSystemTray() {
 	// Check if app supports desktop features (system tray)
 	if desk, ok := ui.app.(desktop.App); ok {
 		// Create menu items
-		aboutTray := fyne.NewMenuItem("About", func() {
-			fyne.Do(ui.showAboutDialog)
-		})
-		helpTray := fyne.NewMenuItem("Help", func() {
-			fyne.Do(ui.showHelpDialog)
-		})
-		updateTray := fyne.NewMenuItem("Check for Update", func() {
-			fyne.Do(func() {
-				ui.checkForUpdates()
-				ui.showAboutDialog()
-			})
-		})
 		ui.showMenuItem = fyne.NewMenuItem("Show", func() {
 			fyne.Do(ui.showWindow)
 		})
 		ui.hideMenuItem = fyne.NewMenuItem("Hide", func() {
 			fyne.Do(ui.hideWindow)
 		})
+		fyne.NewMenuItemSeparator()
+		helpTray := fyne.NewMenuItem("Help", func() {
+			fyne.Do(ui.showHelpDialog)
+		})
+		aboutTray := fyne.NewMenuItem("About", func() {
+			fyne.Do(ui.showAboutDialog)
+		})
+		updateTray := fyne.NewMenuItem("Check for Update", func() {
+			ui.showUpdateDialog()
+		})
+		fyne.NewMenuItemSeparator()
 		quitTray := fyne.NewMenuItem("Quit", func() {
 			fyne.Do(ui.app.Quit)
 		})
 
 		// Create menu
 		menu := fyne.NewMenu("KrankyBear Tetris",
+			ui.showMenuItem,
+			ui.hideMenuItem,
+			fyne.NewMenuItemSeparator(),
 			aboutTray,
 			helpTray,
 			updateTray,
-			fyne.NewMenuItemSeparator(),
-			ui.showMenuItem,
-			ui.hideMenuItem,
 			fyne.NewMenuItemSeparator(),
 			quitTray,
 		)
@@ -264,12 +265,9 @@ func (ui *GameUI) updateTrayMenuState() {
 			fyne.Do(ui.showHelpDialog)
 		})
 		updateTray := fyne.NewMenuItem("Check for Update", func() {
-			fyne.Do(func() {
-				ui.checkForUpdates()
-				ui.showAboutDialog()
-			})
+			ui.showUpdateDialog()
 		})
-		
+
 		// Create show/hide menu items - always create both, but we'll handle logic in callbacks
 		ui.showMenuItem = fyne.NewMenuItem("Show", func() {
 			fyne.Do(func() {
@@ -285,7 +283,7 @@ func (ui *GameUI) updateTrayMenuState() {
 				}
 			})
 		})
-		
+
 		quitTray := fyne.NewMenuItem("Quit", func() {
 			fyne.Do(ui.app.Quit)
 		})
@@ -756,7 +754,6 @@ func max(a, b int) int {
 	return b
 }
 
-
 // positionDialogRelativeToMain positions a dialog window relative to the main window
 // Since Fyne doesn't expose Position/Size directly, we show the dialog first
 // then center it on the same display as the main window
@@ -789,10 +786,13 @@ func (ui *GameUI) showAboutDialog() {
 	})
 
 	// Create image based on version status
+	// Viking Helmet: current version or update available
+	// Hard Hat: running newer version than released
 	var iconResource fyne.Resource
 	if ui.versionStatus == "newer" {
 		iconResource = resourceKrankyBearHardHatPng
 	} else {
+		// "current", "update", or "unknown" - show Viking Helmet
 		iconResource = resourceKrankyBearVikingHelmetPng
 	}
 	iconImage := canvas.NewImageFromResource(iconResource)
@@ -849,6 +849,84 @@ Enjoy the game!`)
 	ui.positionDialogRelativeToMain(dialogWindow)
 }
 
+// showUpdateDialog shows the Update Check dialog with version status and appropriate image
+// Matches the implementation pattern from KrankyBearTailer
+func (ui *GameUI) showUpdateDialog() {
+	// Check if window already exists
+	if ui.updateDialog != nil {
+		ui.updateDialog.RequestFocus()
+		return
+	}
+
+	// Run update check in goroutine to avoid blocking UI
+	go func() {
+		updtmsg, _ := ui.updateChecker()
+		fyne.Do(func() {
+			ui.updateAlert(updtmsg)
+		})
+	}()
+}
+
+// updateAlert displays the update check result in a dialog window
+// Matches the implementation pattern from KrankyBearTailer
+func (ui *GameUI) updateAlert(updtmsg string) {
+	// Check if window already exists
+	if ui.updateDialog != nil {
+		ui.updateDialog.RequestFocus()
+		return
+	}
+
+	// Create release link
+	releaselink, rerr := url.Parse("https://github.com/amarillier/KrankyBearTetris/releases/latest")
+	if rerr != nil {
+		fyne.LogError("Could not parse URL", rerr)
+	}
+	myreleaselink := widget.NewHyperlink("https://github.com/amarillier/KrankyBearTetris/releases/latest", releaselink)
+	myreleaselink.Alignment = fyne.TextAlignLeading
+
+	// Create release notes link
+	releasenoteslink, rnerr := url.Parse("https://github.com/amarillier/KrankyBearTetris/blob/main/ReleaseNotes.txt")
+	if rnerr != nil {
+		fyne.LogError("Could not parse URL", rnerr)
+	}
+	myreleasenoteslink := widget.NewHyperlink("https://github.com/amarillier/KrankyBearTetris/blob/main/ReleaseNotes.txt", releasenoteslink)
+	myreleasenoteslink.Alignment = fyne.TextAlignLeading
+
+	// Create image based on update message
+	// Hard Hat: running newer version than released
+	// Viking Helmet: current version or update available
+	var kbimg *canvas.Image
+	if strings.Contains(updtmsg, "newer version") {
+		kbimg = canvas.NewImageFromResource(resourceKrankyBearHardHatPng)
+		kbimg.FillMode = canvas.ImageFillOriginal
+	} else if strings.Contains(updtmsg, "running the latest") {
+		kbimg = canvas.NewImageFromResource(resourceKrankyBearVikingHelmetPng)
+		kbimg.FillMode = canvas.ImageFillOriginal
+	} else {
+		// For errors or unknown status, show Viking Helmet
+		kbimg = canvas.NewImageFromResource(resourceKrankyBearVikingHelmetPng)
+		kbimg.FillMode = canvas.ImageFillOriginal
+	}
+
+	// Create text label with update message
+	text := widget.NewLabel(updtmsg)
+	text.Wrapping = fyne.TextWrapWord
+
+	// Create content: image, text, release link, release notes link
+	content := container.NewVBox(kbimg, text, myreleaselink, myreleasenoteslink)
+
+	// Create window
+	ui.updateDialog = ui.app.NewWindow(appName + ": Update Check")
+	ui.updateDialog.SetIcon(resourceKrankyBearVikingHelmetPng)
+	ui.updateDialog.Resize(fyne.NewSize(500, 300))
+	ui.updateDialog.SetContent(content)
+	ui.updateDialog.SetCloseIntercept(func() {
+		ui.updateDialog.Close()
+		ui.updateDialog = nil
+	})
+	ui.updateDialog.Show()
+}
+
 // showHelpDialog shows the Help dialog with image on left and text on right
 func (ui *GameUI) showHelpDialog() {
 	// If dialog already exists, bring it to front
@@ -872,10 +950,13 @@ func (ui *GameUI) showHelpDialog() {
 	})
 
 	// Create image based on version status
+	// Viking Helmet: current version or update available
+	// Hard Hat: running newer version than released
 	var iconResource fyne.Resource
 	if ui.versionStatus == "newer" {
 		iconResource = resourceKrankyBearHardHatPng
 	} else {
+		// "current", "update", or "unknown" - show Viking Helmet
 		iconResource = resourceKrankyBearVikingHelmetPng
 	}
 	iconImage := canvas.NewImageFromResource(iconResource)

@@ -2,6 +2,7 @@ Release notes
 
 0.1.NEXT
 - nothing specific planned for now
+- possible iPhone and Android builds (README for sideloading notes)
 
 0.1.0 
 - initial checkin

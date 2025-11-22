@@ -6,7 +6,7 @@ macos: build-darwin
 macos: build-darwin
 
 # Binary name
-BINARY_NAME=template
+BINARY_NAME=tetris
 
 # Build directory
 BUILD_DIR=bin
@@ -36,41 +36,78 @@ build-webview:
 	$(GOMOD) tidy
 	CGO_ENABLED=1 $(GOBUILD) -tags webview -o $(BINARY_NAME) -v
 
-# Build for all platforms
+# Build for all desktop platforms
 build-all: build-linux build-darwin build-windows
+
+# Build for iOS (requires Xcode and iOS SDK, only works on macOS)
+build-ios:
+	@echo "Building for iOS..."
+	@if [[ "$(shell uname)" != "Darwin" ]]; then \
+		echo "Error: iOS builds require macOS and Xcode"; \
+		false; \
+	fi
+	@if ! command -v fyne >/dev/null 2>&1; then \
+		echo "Installing fyne command-line tool..."; \
+		go install fyne.io/fyne/v2/cmd/fyne@latest; \
+	fi
+	@echo "Note: iOS builds require Xcode, iOS SDK, and proper code signing"
+	@echo "Building iOS app bundle..."
+	fyne package -os ios -appID com.github.amarillier.KrankyBearTetris -name "KrankyBear Tetris"
+	@echo "iOS build complete. Output: KrankyBearTetris.app"
+
+# Build for Android (requires Android SDK/NDK)
+build-android:
+	@echo "Building for Android..."
+	@if ! command -v fyne >/dev/null 2>&1; then \
+		echo "Installing fyne command-line tool..."; \
+		go install fyne.io/fyne/v2/cmd/fyne@latest; \
+	fi
+	@echo "Note: Android builds require Android SDK and NDK"
+	@echo "Set ANDROID_NDK_HOME environment variable if needed"
+	@echo "Building Android APK..."
+	fyne package -os android -appID com.github.amarillier.KrankyBearTetris -name "KrankyBear Tetris"
+	@echo "Android build complete. Output: KrankyBearTetris.apk"
+
+# Build for all platforms including mobile
+build-all-platforms: build-all build-ios build-android
 
 build-linux:
 	@echo "Building for Linux..."
 	@mkdir -p $(BUILD_DIR)
-	@echo "Note: Cross-compiling Fyne apps from macOS to Linux requires fyne-cross"
-	@echo "For direct compilation, use: ./compile-linux.sh"
+	@echo "Note: Cross-compiling Fyne apps from macOS to Linux requires fyne-cross or native Linux build"
+	@echo "For direct compilation on Linux, use: ./compile-linux.sh"
 	@echo ""
-	@echo "Option 1 - Use fyne-cross (Docker-based, works from macOS):"
-	@echo "  go install github.com/fyne-io/fyne-cross@latest"
-	@echo "  fyne-cross linux -arch=amd64,arm64"
-	@echo ""
-	@echo "Option 2 - Build directly on Linux:"
-	@echo "  go build -ldflags=\"-w -s\" -o $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64"
-	@echo "=================================================================="
-	@false
+	@echo "Attempting cross-compile with fyne-cross (requires Docker)..."
+	@if command -v fyne-cross >/dev/null 2>&1; then \
+		fyne-cross linux -arch=amd64,arm64 -output $(BINARY_NAME)-linux; \
+	else \
+		echo "fyne-cross not found. Install with: go install github.com/fyne-io/fyne-cross@latest"; \
+		echo "Or build directly on Linux using: ./compile-linux.sh"; \
+		false; \
+	fi
 
 build-darwin:
 	@echo "Building for macOS..."
 	@mkdir -p $(BUILD_DIR)
-	GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 $(GOBUILD) -ldflags="-w -s" -o $(BUILD_DIR)/$(BINARY_NAME)-macos-arm64
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 $(GOBUILD) -ldflags="-w -s" -o $(BUILD_DIR)/$(BINARY_NAME)-macos-amd64
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 $(GOBUILD) -ldflags="-w -s" -trimpath -o $(BUILD_DIR)/$(BINARY_NAME)-macos-arm64
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 $(GOBUILD) -ldflags="-w -s" -trimpath -o $(BUILD_DIR)/$(BINARY_NAME)-macos-amd64
 	# set executable icon
 	./setIcon.sh Resources/Images/KrankyBearVikingHelmet.png $(BUILD_DIR)/$(BINARY_NAME)-macos-arm64
 	./setIcon.sh Resources/Images/KrankyBearVikingHelmet.png $(BUILD_DIR)/$(BINARY_NAME)-macos-amd64
-	cp $(BUILD_DIR)/$(BINARY_NAME)-macos-arm64 ./template
 
 build-windows:
 	@echo "Building for Windows..."
 	@mkdir -p $(BUILD_DIR)
 	@echo "Note: Requires mingw-w64 (brew install mingw-w64 on macOS)"
 	@echo "Note: Console window enabled so flags (-version, -help) work. Use Start-Process -WindowStyle Hidden to hide."
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC="x86_64-w64-mingw32-gcc" $(GOBUILD) -ldflags="-w -s" -o $(BUILD_DIR)/$(BINARY_NAME)-win-amd64.exe -v
-	./setIcon.sh Resources/Images/KrankyBearVikingHelmet.png $(BUILD_DIR)/$(BINARY_NAME)-win-amd64.exe
+	@if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1; then \
+		GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC="x86_64-w64-mingw32-gcc" $(GOBUILD) -ldflags="-w -s" -trimpath -o $(BUILD_DIR)/$(BINARY_NAME)-windows.exe -v; \
+		./setIcon.sh Resources/Images/KrankyBearVikingHelmet.png $(BUILD_DIR)/$(BINARY_NAME)-windows.exe; \
+	else \
+		echo "mingw-w64 not found. Install with: brew install mingw-w64"; \
+		echo "Or use: ./compile-windows.ps1 on Windows"; \
+		false; \
+	fi
 
 build-windows-debug:
 	@echo "Building Windows DEBUG version (with console output)..."
@@ -186,6 +223,9 @@ help:
 	@echo "  make build-windows-debug - Build Windows version with console output (for troubleshooting)"
 	@echo "  make build-windows-webview - Build Windows with WebView support (better UI than MessageBox)"
 	@echo "  make build-windows-webview-debug - Build Windows WebView with console output"
+	@echo "  make build-ios      - Build for iOS (requires macOS, Xcode, iOS SDK)"
+	@echo "  make build-android  - Build for Android (requires Android SDK/NDK)"
+	@echo "  make build-all-platforms - Build for all platforms including mobile"
 	@echo "  make test           - Run tests"
 	@echo "  make test-coverage  - Run tests with coverage report"
 	@echo "  make bench          - Run benchmarks"
