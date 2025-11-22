@@ -85,7 +85,7 @@ done
 
 # Configurable via env vars
 NAME=${NAME:-KrankyBearTetris}
-VERSION=${VERSION:-0.1.0}
+VERSION=${VERSION:-0.1.1}
 ITERATION=${ITERATION:-1}
 OUTDIR=${OUTDIR:-./installers}
 MAINTAINER=${MAINTAINER:-"amarillier@gmail.com"}

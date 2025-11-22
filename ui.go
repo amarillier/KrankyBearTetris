@@ -15,6 +15,27 @@ import (
 	updatechecker "github.com/amarillier/go-update-checker"
 )
 
+// ShortcutBossKey describes the boss key shortcut (F12) - pause and hide window
+// Using F12 as it's commonly used for boss keys and less likely to conflict
+type ShortcutBossKey struct{}
+
+var _ fyne.KeyboardShortcut = (*ShortcutBossKey)(nil)
+
+// Key returns the KeyName for this shortcut
+func (s *ShortcutBossKey) Key() fyne.KeyName {
+	return fyne.KeyF12
+}
+
+// Mod returns the KeyModifier for this shortcut
+func (s *ShortcutBossKey) Mod() fyne.KeyModifier {
+	return fyne.KeyModifierShortcutDefault
+}
+
+// ShortcutName returns the shortcut name
+func (s *ShortcutBossKey) ShortcutName() string {
+	return "BossKey"
+}
+
 const (
 	BlockSize = 25
 	BoardX    = 50
@@ -149,7 +170,7 @@ func (ui *GameUI) setupUI() {
 		ui.pauseButton,
 		ui.resetScoreButton,
 		ui.soundButton,
-		widget.NewLabel("\nControls:\n← → Move\n↓ Soft Drop\n↑ Rotate\nSpace Hard Drop"),
+		widget.NewLabel("\nControls:\n← → Move\n↓ Soft Drop\n↑ Rotate\nSpace Hard Drop\nF12 Boss Key (Pause & Hide)"),
 	)
 
 	// Use HBox to prevent centering and extra space
@@ -325,8 +346,21 @@ func (ui *GameUI) setupKeyboard() {
 		// Handle shortcuts if needed
 	})
 
-	// Set up keyboard event handler
+	// Add boss key shortcut (F12) - pause game and hide window
+	// Using F12 as it's commonly used for boss keys and less likely to conflict
+	ui.window.Canvas().AddShortcut(&ShortcutBossKey{}, func(shortcut fyne.Shortcut) {
+		ui.bossKey()
+	})
+
+	// Also handle F12 in key handler as backup
 	ui.window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
+		// Check for boss key (F12)
+		if ev.Name == fyne.KeyF12 {
+			ui.bossKey()
+			return
+		}
+
+		// Handle other keys normally
 		ui.HandleKey(ev.Name)
 	})
 }
@@ -511,14 +545,17 @@ func (ui *GameUI) updateLabelsOnly() {
 		ui.statusLabel.SetText("Press Start to begin")
 		ui.startButton.Enable()
 		ui.pauseButton.Disable()
+		ui.pauseButton.SetText("Pause")
 	case StatePlaying:
 		ui.statusLabel.SetText("Playing")
 		ui.startButton.Disable()
 		ui.pauseButton.Enable()
+		ui.pauseButton.SetText("Pause")
 	case StatePaused:
 		ui.statusLabel.SetText("Paused")
 		ui.startButton.Disable()
 		ui.pauseButton.Enable()
+		ui.pauseButton.SetText("Resume")
 	case StateGameOver:
 		// Check if this is a high score (only once per game)
 		if !ui.game.scoreSaved {
@@ -704,6 +741,18 @@ func (ui *GameUI) formatHighScores() string {
 		lines = append(lines, "  "+strconv.Itoa(i+1)+". "+strconv.Itoa(score))
 	}
 	return strings.Join(lines, "\n")
+}
+
+// bossKey handles the boss key (F12) - pauses the game and hides the window
+func (ui *GameUI) bossKey() {
+	// Pause the game if it's currently playing
+	if ui.game.State == StatePlaying {
+		ui.game.Pause()
+		ui.Update()
+	}
+
+	// Hide the window
+	ui.hideWindow()
 }
 
 // HandleKey handles keyboard input
@@ -982,6 +1031,8 @@ func (ui *GameUI) showHelpDialog() {
 - **↑** Rotate piece clockwise
 
 **Space Bar:** Hard drop (instantly drop piece to bottom)
+
+**F12:** Boss key - pause the game and hide the window (quickly hide the game)
 
 ## Gameplay
 

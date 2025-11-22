@@ -12,6 +12,10 @@ A cross-platform Tetris game built with Go and the Fyne GUI library. Enjoy class
   - **Mobile Platforms**:
     - **iOS**: iOS 13.0 or later (requires sideloading)
     - **Android**: Android 5.0 (API level 21) or later
+- **Boss Key**: Press `F12` to quickly pause the game and hide the window
+- **Sound Effects**: Toggleable sound effects for game events
+- **High Scores**: Persistent high score tracking (top 5 scores)
+- **System Tray**: Runs in the system tray for easy access
 
 # Features & Known Issues
 

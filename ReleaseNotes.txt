@@ -5,6 +5,10 @@ Release notes
 - attempting better active display / mouse location for opening the game at launch on the current display
 - possible iPhone and Android builds (README for sideloading notes)
 
+
+0.1.1
+- Hotkey / Bosskey F12 to pause and hide
+
 0.1.0 
 - initial checkin
 - Windows, Linux and MacOS Tetris game

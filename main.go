@@ -11,7 +11,7 @@ import (
 
 const (
 	// appName    = "KrankyBear Tetris"
-	appVersion = "0.1.0" // see FyneApp.toml
+	appVersion = "0.1.1" // see FyneApp.toml
 	appAuthor  = "Allan Marillier"
 )
 
